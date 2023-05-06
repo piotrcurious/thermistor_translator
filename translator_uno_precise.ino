@@ -68,7 +68,7 @@ void setup() {
 void loop() {
 
   // Initialize a variable to store the oversampled input value
-  int oversampledInputValue = 0;
+  uint32_t oversampledInputValue = 0;
   
   // Initialize a variable to store the number of samples taken
   uint16_t sampleCount = 0;
