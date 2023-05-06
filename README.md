@@ -3,6 +3,6 @@ translates any analog input profile into any analog output profile using a looku
 
 Written by BingAI.
 
-It os designed to allow f.e. replacing one thermistor model with another thermistor model,
+It is designed to allow f.e. replacing one thermistor model with another thermistor model,
 a common problem when repairing old machines and cars whose original parts are 
 no longer available. 
