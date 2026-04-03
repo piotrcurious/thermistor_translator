@@ -136,6 +136,12 @@ public:
             logFile << t << "," << in_t << "," << adc << "," << pwm << "," << out_v << "," << out_t << std::endl;
         }
     }
+    // Overload for simpler tests
+    void log(uint32_t t, uint16_t adc, int pwm) {
+        if (logFile.is_open()) {
+            logFile << t << ",0," << adc << "," << pwm << ",0,0" << std::endl;
+        }
+    }
     void print(const char* s) { std::cout << s; }
     void print(int n) { std::cout << n; }
     void print(float f) { std::cout << f; }

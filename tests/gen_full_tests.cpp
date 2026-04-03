@@ -52,8 +52,10 @@ int main() {
     std::vector<TestConfig> tests = {
         {"v1", "translator.ino", 255, false, HIGH},
         {"v2", "translator_v2.ino", 255, false, HIGH},
-        {"v3_curveA", "translator_v3_switchable2.ino", 255, true, HIGH},
-        {"v3_curveB", "translator_v3_switchable2.ino", 255, true, LOW},
+        {"v3_switchable_A", "translator_v3_switchable.ino", 255, true, HIGH},
+        {"v3_switchable_B", "translator_v3_switchable.ino", 255, true, LOW},
+        {"v3_switchable2_A", "translator_v3_switchable2.ino", 255, true, HIGH},
+        {"v3_switchable2_B", "translator_v3_switchable2.ino", 255, true, LOW},
         {"adc_to_pwm", "adc_to_pwm.ino", 4095, false, HIGH},
         {"uno_precise", "translator_uno_precise.ino", 4095, false, HIGH}
     };
