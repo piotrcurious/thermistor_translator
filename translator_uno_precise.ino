@@ -5,6 +5,10 @@
 // with 12-bit PWM resolution and fastest PWM timer mode
 // for Arduino Uno or Nano
 
+#if defined(ARDUINO_ARCH_AVR)
+  #include <avr/pgmspace.h>
+#endif
+
 // Define the table of input-output values
 const uint8_t table[] PROGMEM = {
   0,   // input = 0, output = 0
@@ -21,11 +25,8 @@ const uint8_t tableSize = sizeof(table) / sizeof(table[0]);
 const uint8_t inputPin = A0;
 const uint8_t outputPin = 9;
 
-// Define the time constant for oversampling in milliseconds
-const uint16_t oversamplingTime = 10;
-
-// Define the time constant for Kalman filter in milliseconds
-const uint16_t kalmanTime = 100;
+// Define the interval for oversampling in milliseconds
+const uint16_t oversamplingInterval = 10;
 
 // Define the Kalman filter parameters
 float kalmanGain = 0.01; // initial guess for the Kalman gain
@@ -38,9 +39,7 @@ void setup() {
   // Set the output pin as output
   pinMode(outputPin, OUTPUT);
   
-  // Set the PWM resolution to 12 bits (0-4095)
-  analogWriteResolution(12);
-  
+  // Configure Timer1 for 12-bit PWM resolution (0-4095)
   // Set the PWM timer to fastest mode (without prescaler)
   
     // Stop Timer1
@@ -54,8 +53,8 @@ void setup() {
     // Set Timer1 prescaler to no prescaling (clock frequency is F_CPU)
     TCCR1B |= (1 << CS10);
     
-    // Set Timer1 TOP value to get a PWM frequency of F_CPU / (TOP + 1)
-    ICR1 = analogWriteMax() - 1; // analogWriteMax() returns the maximum value for PWM resolution
+    // Set Timer1 TOP value to 4095 for 12-bit resolution
+    ICR1 = 4095;
     
     // Set Timer1 duty cycle for pin9 to zero initially
     OCR1A = 0;
@@ -65,72 +64,52 @@ void setup() {
     
 }
 
+static uint32_t adcSum = 0;
+static uint16_t adcSamples = 0;
+static uint32_t lastOversampleMs = 0;
+
 void loop() {
 
-  // Initialize a variable to store the oversampled input value
-  uint32_t oversampledInputValue = 0;
-  
-  // Initialize a variable to store the number of samples taken
-  uint16_t sampleCount = 0;
-  
-  // Initialize a variable to store the start time of oversampling
-  uint32_t startTime = millis();
-  
-  // Loop until the oversampling time is reached
-  while (millis() - startTime < oversamplingTime) {
-    // Read the analog value from the input pin (0-1023) and add it to the oversampled input value
-    oversampledInputValue += analogRead(inputPin);
-    
-    // Increment the sample count by one
-    sampleCount++;
-    
-    // Wait for a short time to avoid reading noise
-    delayMicroseconds(10);
-    
+    // ── Oversampling (Non-blocking) ──────────────────────────────────────────
+    adcSum += analogRead(inputPin);
+    adcSamples++;
+
+    if (millis() - lastOversampleMs >= oversamplingInterval) {
+        float measurement = (float)adcSum / adcSamples;
+        adcSum = 0;
+        adcSamples = 0;
+        lastOversampleMs = millis();
+
+        // ── Kalman filter ─────────────────────────────────────────────────────
+        // Predict step (simplified: state is constant)
+        // Update step
+        kalmanGain = errorEstimate / (errorEstimate + errorMeasure);
+        estimate = estimate + kalmanGain * (measurement - estimate);
+        errorEstimate = (1 - kalmanGain) * errorEstimate;
     }
-    
-    // Calculate the average of the oversampled input value by dividing by the sample count
-    oversampledInputValue /= sampleCount;
-    
-    // Apply the Kalman filter to the oversampled input value
-    
-    // Calculate the Kalman gain using the previous estimate error and measurement error
-    kalmanGain = errorEstimate / (errorEstimate + errorMeasure);
-    
-    // Update the estimate using the previous estimate, the Kalman gain and the oversampled input value
-    estimate = estimate + kalmanGain * (oversampledInputValue - estimate);
-    
-    // Update the estimate error using the previous estimate error and the Kalman gain
-    errorEstimate = (1 - kalmanGain) * errorEstimate;
-    
-    // Map the estimate to the table range (0-4)
-    int tableIndex = map(estimate,0 ,1023 ,0 ,tableSize -1);
-    
-    // Constrain the table index to avoid overflow
-    tableIndex = constrain(tableIndex,0 ,tableSize -1);
-    
-    // Read the output value from the table using PROGMEM
-    int outputValue = pgm_read_byte(&table[tableIndex]);
-    
-    // If the table index is not the last one, interpolate the output value with the next one
-    if (tableIndex < tableSize -1) {
-      // Read the next output value from the table using PROGMEM
-      int nextOutputValue = pgm_read_byte(&table[tableIndex +1]);
-      
-      // Calculate the fraction of the estimate between the two table indices (0-1)
-      float fraction =(float)(estimate - map(tableIndex ,0 ,tableSize -1 ,0 ,1023)) /(float)(map(tableIndex +1 ,0 ,tableSize -1 ,0 ,1023) - map(tableIndex ,0 ,tableSize -1 ,0 ,1023));
-      
-      // Interpolate the output value with the next one using the fraction
-      outputValue = outputValue + fraction * (nextOutputValue - outputValue);
-      
-      }
-      
-      // Constrain the output value to avoid overflow
-      outputValue = constrain(outputValue,0 ,analogWriteMax() -1);
+
+    // Calculate fractional table index
+    float tableIndexF = estimate * (tableSize - 1) / 1023.0f;
+    int tableIndex = (int)tableIndexF;
+
+    uint16_t outputValue;
+    if (tableIndex >= tableSize - 1) {
+        outputValue = pgm_read_byte(&table[tableSize - 1]);
+    } else {
+        uint8_t y0 = pgm_read_byte(&table[tableIndex]);
+        uint8_t y1 = pgm_read_byte(&table[tableIndex + 1]);
+        float fraction = tableIndexF - (float)tableIndex;
+        outputValue = (uint16_t)(y0 + fraction * (y1 - y0) + 0.5f);
+    }
+
+    // Scale to 12-bit if table values were 8-bit,
+    // but here the table values are 0-100, and output should be 0-4095.
+    // Wait, the original code didn't scale much, just used the table value.
+    // Let's check the original intention. Table was 0-100. PWM was 0-4095.
+    // This looks like it needs scaling or the table values should be larger.
+    // Let's scale it to the full 12-bit range.
+    uint16_t scaledOutput = map(outputValue, 0, 100, 0, 4095);
       
       // Write the output value to pin9 using Timer1 duty cycle register OCR1A
-      OCR1A = outputValue;
-      
-      // Wait for the Kalman time to update the estimate
-      delay(kalmanTime);
+      OCR1A = scaledOutput;
 }
