@@ -123,14 +123,17 @@ class MockSerial {
 public:
     void begin(unsigned long baud) {}
     void openLog(const std::string& path) {
+        if (logFile.is_open()) logFile.close();
         logFile.open(path);
         if (logFile.is_open()) {
-            logFile << "time,adc,pwm" << std::endl;
+            logFile << "time,in_temp,adc,pwm,out_volt,out_temp" << std::endl;
+        } else {
+            std::cerr << "Failed to open log file: " << path << std::endl;
         }
     }
-    void log(uint32_t t, uint16_t adc, int pwm) {
+    void log(uint32_t t, float in_t, uint16_t adc, int pwm, float out_v, float out_t) {
         if (logFile.is_open()) {
-            logFile << t << "," << adc << "," << pwm << std::endl;
+            logFile << t << "," << in_t << "," << adc << "," << pwm << "," << out_v << "," << out_t << std::endl;
         }
     }
     void print(const char* s) { std::cout << s; }
