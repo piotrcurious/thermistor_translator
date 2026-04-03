@@ -18,15 +18,26 @@ python3 tests/run_tests.py
 
 The tests verify the translation logic of all `.ino` files using a simulated NTC thermistor and voltage divider circuit. It also includes noise robustness tests to evaluate the performance of Kalman and IIR filters.
 
-### Visualization
+### System Simulation
 
-The testing suite generates transfer curve visualizations as SVGs:
+The testing suite simulates the entire hardware chain:
+`Input Temp -> Source NTC -> Voltage Divider -> ADC -> Arduino -> PWM -> RC Filter -> Voltage -> Target NTC Interpretation -> Output Temp`
 
-- **Translator Transfer Curve**:
-![Translator](tests/data_translator.svg)
+#### Results for `translator_v3_switchable2.ino` (Curve A)
 
-- **ADC to PWM (12-bit) Transfer Curve**:
-![ADC to PWM](tests/data_adc_to_pwm.svg)
+- **Translation Accuracy (Input vs Output Temp)**:
+![Accuracy](tests/data_v3_curveA_accuracy.svg)
+- **Voltage Response**:
+![Voltage](tests/data_v3_curveA_voltage.svg)
+- **Firmware Transfer Curve (ADC vs PWM)**:
+![Transfer](tests/data_v3_curveA_transfer.svg)
+
+#### Results for `adc_to_pwm.ino` (High-Precision 12-bit)
+
+- **Translation Accuracy**:
+![Accuracy](tests/data_adc_to_pwm_accuracy.svg)
+- **Firmware Transfer Curve**:
+![Transfer](tests/data_adc_to_pwm_transfer.svg)
 
 ## Tools
 
