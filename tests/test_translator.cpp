@@ -5,6 +5,7 @@
 #include "../translator.ino"
 
 int main() {
+    Serial.openLog("tests/data_translator.csv");
     setup();
     Thermistor ntc(10000, 25, 3950);
     VoltageDivider circuit(5.0, 10000);
@@ -13,7 +14,10 @@ int main() {
         double r = ntc.getResistance(t);
         double v = circuit.getVout(r);
         g_adc_value = circuit.getADC(v, 5.0, 1024);
-        for(int i=0; i<100; ++i) loop();
+        for(int i=0; i<100; ++i) {
+            loop();
+            Serial.log(millis(), g_adc_value, g_last_analog_write_value);
+        }
 
         // Simple assertion: output should be positive and vary with temperature
         assert(g_last_analog_write_value >= 0);

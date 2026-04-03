@@ -26,6 +26,15 @@ def run_test(test_file):
     try:
         subprocess.run(compile_cmd, check=True)
         subprocess.run([binary], check=True)
+
+        # Check for generated CSV and plot it
+        csv_name = f"tests/data_{test_file.replace('test_', '').replace('.cpp', '')}.csv"
+        if os.path.exists(csv_name):
+            svg_name = csv_name.replace('.csv', '.svg')
+            title = test_file.replace('.cpp', '').replace('_', ' ').title()
+            subprocess.run(["python3", "tools/plot_results.py", csv_name, svg_name, title], check=True)
+            print(f"Generated plot: {svg_name}")
+
         print(f"Successfully ran {test_file}\n")
     except subprocess.CalledProcessError as e:
         print(f"Failed to run {test_file}: {e}\n")
