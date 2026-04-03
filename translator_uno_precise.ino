@@ -38,9 +38,7 @@ void setup() {
   // Set the output pin as output
   pinMode(outputPin, OUTPUT);
   
-  // Set the PWM resolution to 12 bits (0-4095)
-  analogWriteResolution(12);
-  
+  // Configure Timer1 for 12-bit PWM resolution (0-4095)
   // Set the PWM timer to fastest mode (without prescaler)
   
     // Stop Timer1
@@ -54,8 +52,8 @@ void setup() {
     // Set Timer1 prescaler to no prescaling (clock frequency is F_CPU)
     TCCR1B |= (1 << CS10);
     
-    // Set Timer1 TOP value to get a PWM frequency of F_CPU / (TOP + 1)
-    ICR1 = analogWriteMax() - 1; // analogWriteMax() returns the maximum value for PWM resolution
+    // Set Timer1 TOP value to 4095 for 12-bit resolution
+    ICR1 = 4095;
     
     // Set Timer1 duty cycle for pin9 to zero initially
     OCR1A = 0;
@@ -126,7 +124,7 @@ void loop() {
       }
       
       // Constrain the output value to avoid overflow
-      outputValue = constrain(outputValue,0 ,analogWriteMax() -1);
+      outputValue = constrain(outputValue,0 ,4095);
       
       // Write the output value to pin9 using Timer1 duty cycle register OCR1A
       OCR1A = outputValue;

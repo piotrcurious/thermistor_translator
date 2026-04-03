@@ -42,7 +42,12 @@ uint16_t OCR1A = 0;
 // Mocking functions
 unsigned long g_millis = 0;
 uint16_t g_adc_value = 0;
-uint8_t g_digital_pins[14] = {HIGH}; // Initialize all as HIGH for pull-up simulation
+uint8_t g_digital_pins[14] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH}; // Initialize all as HIGH for pull-up simulation
+
+static float g_noise_level = 0.0f;
+void setADCNoise(float level) {
+    g_noise_level = level;
+}
 
 void pinMode(uint8_t pin, uint8_t mode) {}
 void digitalWrite(uint8_t pin, uint8_t val) {
@@ -53,6 +58,13 @@ int digitalRead(uint8_t pin) {
     return HIGH;
 }
 int analogRead(uint8_t pin) {
+    if (g_noise_level > 0.0f) {
+        float noise = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * g_noise_level;
+        int val = (int)(g_adc_value + noise + 0.5f);
+        if (val < 0) return 0;
+        if (val > 1023) return 1023;
+        return val;
+    }
     return g_adc_value;
 }
 
@@ -73,8 +85,13 @@ void delay(unsigned long ms) {
     g_millis += ms;
 }
 
+static uint32_t g_us_counter = 0;
 void delayMicroseconds(unsigned int us) {
-    // For simplicity, we can ignore tiny delays or increment g_millis
+    g_us_counter += us;
+    if (g_us_counter >= 1000) {
+        g_millis += g_us_counter / 1000;
+        g_us_counter %= 1000;
+    }
 }
 
 long map(long x, long in_min, long in_max, long out_min, long out_max) {

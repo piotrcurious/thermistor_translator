@@ -90,44 +90,46 @@ void setup() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+static uint32_t adcSum   = 0;
+static uint16_t adcCount = 0;
+static uint32_t lastOversampleMs = 0;
+
 void loop() {
     uint32_t loopStart = millis();
 
-    // ── Oversampling ──────────────────────────────────────────────────────────
-    // Accumulate ADC readings for OVERSAMPLE_MS milliseconds, then average.
-    // The ADC conversion time (~104 µs at default 125 kHz clock) naturally
-    // limits the sample rate; no artificial delay is needed.
-    uint32_t adcSum   = 0;
-    uint16_t adcCount = 0;
-    uint32_t t0       = millis();
+    // ── Oversampling (Non-blocking) ──────────────────────────────────────────
+    // Accumulate ADC readings continuously. Process every OVERSAMPLE_MS.
+    adcSum += analogRead(INPUT_PIN);
+    adcCount++;
 
-    while (millis() - t0 < OVERSAMPLE_MS) {
-        adcSum += analogRead(INPUT_PIN);
-        adcCount++;
+    if (millis() - lastOversampleMs >= OVERSAMPLE_MS) {
+        float measurement = (adcCount > 0)
+                            ? (float)adcSum / adcCount
+                            : kf_x;
+
+        adcSum = 0;
+        adcCount = 0;
+        lastOversampleMs = millis();
+
+        // ── Kalman filter ─────────────────────────────────────────────────────
+        // Predict step
+        float P_pred = kf_P + KF_Q;
+
+        // Update step
+        float K  = P_pred / (P_pred + KF_R);
+        kf_x     = kf_x + K * (measurement - kf_x);
+        kf_P     = (1.0f - K) * P_pred;
     }
 
-    float measurement = (adcCount > 0)
-                        ? (float)adcSum / adcCount
-                        : kf_x;  // fallback: keep previous estimate
-
-    // ── Kalman filter ─────────────────────────────────────────────────────────
-    // Predict step (adds process noise so the filter never "freezes")
-    float P_pred = kf_P + KF_Q;
-
-    // Update step
-    float K  = P_pred / (P_pred + KF_R);
-    kf_x     = kf_x + K * (measurement - kf_x);
-    kf_P     = (1.0f - K) * P_pred;  // use P_pred here — keeps P > 0
-
     // ── Table lookup + interpolation ─────────────────────────────────────────
+    // We do this every loop to ensure PWM is always set, although kf_x
+    // only changes every OVERSAMPLE_MS.
     uint16_t pwmVal = lookupInterpolate(kf_x);
 
     // ── Write to Timer1 directly ─────────────────────────────────────────────
     OCR1A = pwmVal;
 
-    // ── Non-blocking hold to maintain LOOP_PERIOD_MS ─────────────────────────
-    uint32_t elapsed = millis() - loopStart;
-    if (elapsed < LOOP_PERIOD_MS) {
-        delay(LOOP_PERIOD_MS - elapsed);
-    }
+    // Maintain a small loop delay to avoid running too fast in the simulation
+    // and to simulate real-world ADC sample rate limits.
+    delayMicroseconds(100);
 }
