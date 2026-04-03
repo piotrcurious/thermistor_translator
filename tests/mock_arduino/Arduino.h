@@ -26,6 +26,10 @@ typedef bool boolean;
 #define pgm_read_byte(addr) (*(const uint8_t*)(addr))
 #define pgm_read_word(addr) (*(const uint16_t*)(addr))
 
+#include <iostream>
+#include <fstream>
+#include <string>
+
 // Mocking some AVR registers
 uint8_t TCCR1A = 0;
 uint8_t TCCR1B = 0;
@@ -115,8 +119,20 @@ int analogWriteMax() { return 4096; } // Assuming 12-bit based on the code in so
 #define static_assert(cond, msg)
 
 class MockSerial {
+    std::ofstream logFile;
 public:
     void begin(unsigned long baud) {}
+    void openLog(const std::string& path) {
+        logFile.open(path);
+        if (logFile.is_open()) {
+            logFile << "time,adc,pwm" << std::endl;
+        }
+    }
+    void log(uint32_t t, uint16_t adc, int pwm) {
+        if (logFile.is_open()) {
+            logFile << t << "," << adc << "," << pwm << std::endl;
+        }
+    }
     void print(const char* s) { std::cout << s; }
     void print(int n) { std::cout << n; }
     void print(float f) { std::cout << f; }
