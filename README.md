@@ -1,49 +1,69 @@
-# thermistor_translator
-translates any analog input profile into any analog output profile using a lookup table
+# Thermistor Signal Translator
 
-Written by BingAI.
+This project provides various Arduino-based solutions for translating analog signals from one thermistor profile to another using lookup tables. This is especially useful for replacing obsolete or unavailable thermistors in older machinery or vehicles.
 
-It is designed to allow f.e. replacing one thermistor model with another thermistor model,
-a common problem when repairing old machines and cars whose original parts are 
-no longer available. 
+## Features
+
+- **Profile Translation**: Maps any input resistance curve to any output voltage curve.
+- **Lookup Tables with Interpolation**: Uses `PROGMEM` to store translation points with linear interpolation for high accuracy.
+- **Signal Conditioning**: Includes versions with IIR and Kalman filtering for noise reduction.
+- **Non-blocking Architecture**: All modern versions use asynchronous logic for high responsiveness.
+- **Safety Failsafes**: Detects sensor disconnection or short-circuits to prevent system damage.
+- **High-Resolution PWM**: Support for 12-bit PWM on AVR targets.
+
+## Available Versions
+
+### 1. Simple Translator (`translator.ino`)
+- **Description**: The most basic version, now improved with IIR filtering and robust interpolation.
+- **Best For**: Systems where simplicity is key and noise is moderate.
+- **Accuracy**: ![v1 Accuracy](tests/data_v1_accuracy.svg)
+
+### 2. Precise Translator (`translator_v2.ino`)
+- **Description**: Uses explicitly defined ADC/PWM breakpoints for non-linear mappings.
+- **Best For**: Highly non-linear thermistor curves.
+- **Accuracy**: ![v2 Accuracy](tests/data_v2_accuracy.svg)
+
+### 3. Switchable Curve (`translator_v3_switchable.ino`)
+- **Description**: Allows switching between two different translation curves using a physical pin.
+- **Best For**: Applications with multi-mode operation or selectable sensor types.
+- **Accuracy (Curve A)**: ![v3A Accuracy](tests/data_v3_switchable_A_accuracy.svg)
+- **Accuracy (Curve B)**: ![v3B Accuracy](tests/data_v3_switchable_B_accuracy.svg)
+
+### 4. Precise Switchable (`translator_v3_switchable2.ino`)
+- **Description**: Combines switchable curves with advanced interpolation structures.
+- **Accuracy (Curve A)**: ![v3_2A Accuracy](tests/data_v3_switchable2_A_accuracy.svg)
+
+### 5. High-Resolution Kalman (`adc_to_pwm.ino`)
+- **Description**: Industrial-grade implementation with 12-bit PWM and scalar Kalman filtering.
+- **Best For**: High-precision measurement and control systems.
+- **Accuracy**: ![adc_to_pwm Accuracy](tests/data_adc_to_pwm_accuracy.svg)
+
+### 6. Uno Precise (`translator_uno_precise.ino`)
+- **Description**: Specifically optimized for ATmega328P with manual Timer1 configuration for 12-bit resolution.
+- **Accuracy**: ![uno_precise Accuracy](tests/data_uno_precise_accuracy.svg)
+
+## System Simulation
+
+Every version is verified using a full hardware-in-the-loop (HIL) simulation chain:
+`Input Temp -> Source NTC -> Voltage Divider -> ADC -> Arduino -> PWM -> RC Filter -> Voltage -> Target NTC Interpretation -> Output Temp`
+
+### Simulation Results (Example: High-Precision Version)
+- **Voltage Response**: ![Voltage](tests/data_adc_to_pwm_voltage.svg)
+- **Internal Transfer Curve**: ![Transfer](tests/data_adc_to_pwm_transfer.svg)
 
 ## Testing
 
-This project includes a comprehensive testing suite using a mock Arduino environment and a physics/circuit simulator.
-
-To run the tests:
+Run the full automated test suite:
 ```bash
 python3 tests/run_tests.py
 ```
+This script compiles all sketches, runs simulations, evaluates noise robustness, and generates the SVG graphs shown above.
 
-The tests verify the translation logic of all `.ino` files using a simulated NTC thermistor and voltage divider circuit. It also includes noise robustness tests to evaluate the performance of Kalman and IIR filters.
+## Developer Tools
 
-### System Simulation
-
-The testing suite simulates the entire hardware chain:
-`Input Temp -> Source NTC -> Voltage Divider -> ADC -> Arduino -> PWM -> RC Filter -> Voltage -> Target NTC Interpretation -> Output Temp`
-
-#### Results for `translator_v3_switchable2.ino` (Curve A)
-
-- **Translation Accuracy (Input vs Output Temp)**:
-![Accuracy](tests/data_v3_curveA_accuracy.svg)
-- **Voltage Response**:
-![Voltage](tests/data_v3_curveA_voltage.svg)
-- **Firmware Transfer Curve (ADC vs PWM)**:
-![Transfer](tests/data_v3_curveA_transfer.svg)
-
-#### Results for `adc_to_pwm.ino` (High-Precision 12-bit)
-
-- **Translation Accuracy**:
-![Accuracy](tests/data_adc_to_pwm_accuracy.svg)
-- **Firmware Transfer Curve**:
-![Transfer](tests/data_adc_to_pwm_transfer.svg)
-
-## Tools
-
-### Table Generator
-
-A tool to generate `PROGMEM` lookup tables based on thermistor parameters:
+### Table Generator (`tools/gen_table.py`)
+Generate a `PROGMEM` lookup table by defining your source and target sensor parameters:
 ```bash
-python3 tools/gen_table.py --r0 10000 --b 3950 --rp 10000 --points 10
+python3 tools/gen_table.py --sr0 10000 --sb 3950 --tr0 10000 --tb 3435 --points 16
 ```
+It supports end-to-end translation, ripple prediction, and resolution scaling.
