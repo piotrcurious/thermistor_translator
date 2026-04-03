@@ -21,11 +21,8 @@ const uint8_t tableSize = sizeof(table) / sizeof(table[0]);
 const uint8_t inputPin = A0;
 const uint8_t outputPin = 9;
 
-// Define the time constant for oversampling in milliseconds
-const uint16_t oversamplingTime = 10;
-
-// Define the time constant for Kalman filter in milliseconds
-const uint16_t kalmanTime = 100;
+// Define the interval for oversampling in milliseconds
+const uint16_t oversamplingInterval = 10;
 
 // Define the Kalman filter parameters
 float kalmanGain = 0.01; // initial guess for the Kalman gain
@@ -63,44 +60,30 @@ void setup() {
     
 }
 
+static uint32_t adcSum = 0;
+static uint16_t adcSamples = 0;
+static uint32_t lastOversampleMs = 0;
+
 void loop() {
 
-  // Initialize a variable to store the oversampled input value
-  uint32_t oversampledInputValue = 0;
-  
-  // Initialize a variable to store the number of samples taken
-  uint16_t sampleCount = 0;
-  
-  // Initialize a variable to store the start time of oversampling
-  uint32_t startTime = millis();
-  
-  // Loop until the oversampling time is reached
-  while (millis() - startTime < oversamplingTime) {
-    // Read the analog value from the input pin (0-1023) and add it to the oversampled input value
-    oversampledInputValue += analogRead(inputPin);
-    
-    // Increment the sample count by one
-    sampleCount++;
-    
-    // Wait for a short time to avoid reading noise
-    delayMicroseconds(10);
-    
+    // ── Oversampling (Non-blocking) ──────────────────────────────────────────
+    adcSum += analogRead(inputPin);
+    adcSamples++;
+
+    if (millis() - lastOversampleMs >= oversamplingInterval) {
+        float measurement = (float)adcSum / adcSamples;
+        adcSum = 0;
+        adcSamples = 0;
+        lastOversampleMs = millis();
+
+        // ── Kalman filter ─────────────────────────────────────────────────────
+        // Predict step (simplified: state is constant)
+        // Update step
+        kalmanGain = errorEstimate / (errorEstimate + errorMeasure);
+        estimate = estimate + kalmanGain * (measurement - estimate);
+        errorEstimate = (1 - kalmanGain) * errorEstimate;
     }
-    
-    // Calculate the average of the oversampled input value by dividing by the sample count
-    oversampledInputValue /= sampleCount;
-    
-    // Apply the Kalman filter to the oversampled input value
-    
-    // Calculate the Kalman gain using the previous estimate error and measurement error
-    kalmanGain = errorEstimate / (errorEstimate + errorMeasure);
-    
-    // Update the estimate using the previous estimate, the Kalman gain and the oversampled input value
-    estimate = estimate + kalmanGain * (oversampledInputValue - estimate);
-    
-    // Update the estimate error using the previous estimate error and the Kalman gain
-    errorEstimate = (1 - kalmanGain) * errorEstimate;
-    
+
     // Map the estimate to the table range (0-4)
     int tableIndex = map(estimate,0 ,1023 ,0 ,tableSize -1);
     
@@ -128,7 +111,4 @@ void loop() {
       
       // Write the output value to pin9 using Timer1 duty cycle register OCR1A
       OCR1A = outputValue;
-      
-      // Wait for the Kalman time to update the estimate
-      delay(kalmanTime);
 }
