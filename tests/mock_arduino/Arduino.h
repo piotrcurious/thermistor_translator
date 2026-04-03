@@ -114,4 +114,18 @@ int analogWriteMax() { return 4096; } // Assuming 12-bit based on the code in so
 
 #define static_assert(cond, msg)
 
+class MockSerial {
+public:
+    void begin(unsigned long baud) {}
+    void print(const char* s) { std::cout << s; }
+    void print(int n) { std::cout << n; }
+    void print(float f) { std::cout << f; }
+    void println(const char* s) { std::cout << s << std::endl; }
+    void println(int n) { std::cout << n << std::endl; }
+    void println(float f) { std::cout << f << std::endl; }
+    void println() { std::cout << std::endl; }
+};
+
+static MockSerial Serial;
+
 #endif

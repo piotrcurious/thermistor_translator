@@ -8,6 +8,11 @@ constexpr uint8_t INPUT_PIN  = A0;
 constexpr uint8_t OUTPUT_PIN = 9;
 constexpr uint16_t ADC_MAX   = 1023;
 
+// Failsafe configuration: detect sensor disconnection/short
+constexpr uint16_t FAILSAFE_ADC_MIN = 5;
+constexpr uint16_t FAILSAFE_ADC_MAX = 1018;
+constexpr uint8_t  FAILSAFE_PWM     = 255; // Default to full speed on failure
+
 // Explicit transfer curve:
 // ADC breakpoints on the X axis, PWM values on the Y axis.
 // Keep both arrays the same length and sorted by ADC value.
@@ -110,6 +115,12 @@ void loop()
   const uint16_t rawAdc = analogRead(INPUT_PIN);
   const uint16_t adc    = smoothAdc(rawAdc);
 
-  const uint8_t pwm = interpolateTransfer(adc);
+  uint8_t pwm;
+  if (adc < FAILSAFE_ADC_MIN || adc > FAILSAFE_ADC_MAX) {
+    pwm = FAILSAFE_PWM;
+  } else {
+    pwm = interpolateTransfer(adc);
+  }
+
   analogWrite(OUTPUT_PIN, pwm);
 }

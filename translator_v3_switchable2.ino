@@ -11,6 +11,11 @@ constexpr uint8_t SELECT_PIN = 2;   // INPUT_PULLUP: HIGH = curve A, LOW = curve
 constexpr uint16_t ADC_MAX = 1023;
 constexpr uint8_t  PWM_MAX = 255;
 
+// Failsafe configuration: detect sensor disconnection/short
+constexpr uint16_t FAILSAFE_ADC_MIN = 5;
+constexpr uint16_t FAILSAFE_ADC_MAX = 1018;
+constexpr uint8_t  FAILSAFE_PWM     = 255; // Default to full speed on failure
+
 struct TransferCurve {
   const uint16_t* adcPoints;
   const uint8_t*  pwmPoints;
@@ -149,8 +154,13 @@ void loop()
   const uint16_t rawAdc = analogRead(INPUT_PIN);
   const uint16_t adc = smoothAdc(rawAdc);
 
-  const TransferCurve& curve = readSelectedCurve();
-  const uint8_t pwm = interpolateTransfer(curve, adc);
+  uint8_t pwm;
+  if (adc < FAILSAFE_ADC_MIN || adc > FAILSAFE_ADC_MAX) {
+    pwm = FAILSAFE_PWM;
+  } else {
+    const TransferCurve& curve = readSelectedCurve();
+    pwm = interpolateTransfer(curve, adc);
+  }
 
   analogWrite(OUTPUT_PIN, pwm);
 }
