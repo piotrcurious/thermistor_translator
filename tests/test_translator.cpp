@@ -13,7 +13,7 @@ int main() {
         double r = ntc.getResistance(t);
         double v = circuit.getVout(r);
         g_adc_value = circuit.getADC(v, 5.0, 1024);
-        loop();
+        for(int i=0; i<100; ++i) loop();
 
         // Simple assertion: output should be positive and vary with temperature
         assert(g_last_analog_write_value >= 0);

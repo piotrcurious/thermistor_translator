@@ -5,6 +5,10 @@
 // with 12-bit PWM resolution and fastest PWM timer mode
 // for Arduino Uno or Nano
 
+#if defined(ARDUINO_ARCH_AVR)
+  #include <avr/pgmspace.h>
+#endif
+
 // Define the table of input-output values
 const uint8_t table[] PROGMEM = {
   0,   // input = 0, output = 0
@@ -84,31 +88,28 @@ void loop() {
         errorEstimate = (1 - kalmanGain) * errorEstimate;
     }
 
-    // Map the estimate to the table range (0-4)
-    int tableIndex = map(estimate,0 ,1023 ,0 ,tableSize -1);
-    
-    // Constrain the table index to avoid overflow
-    tableIndex = constrain(tableIndex,0 ,tableSize -1);
-    
-    // Read the output value from the table using PROGMEM
-    int outputValue = pgm_read_byte(&table[tableIndex]);
-    
-    // If the table index is not the last one, interpolate the output value with the next one
-    if (tableIndex < tableSize -1) {
-      // Read the next output value from the table using PROGMEM
-      int nextOutputValue = pgm_read_byte(&table[tableIndex +1]);
-      
-      // Calculate the fraction of the estimate between the two table indices (0-1)
-      float fraction =(float)(estimate - map(tableIndex ,0 ,tableSize -1 ,0 ,1023)) /(float)(map(tableIndex +1 ,0 ,tableSize -1 ,0 ,1023) - map(tableIndex ,0 ,tableSize -1 ,0 ,1023));
-      
-      // Interpolate the output value with the next one using the fraction
-      outputValue = outputValue + fraction * (nextOutputValue - outputValue);
-      
-      }
-      
-      // Constrain the output value to avoid overflow
-      outputValue = constrain(outputValue,0 ,4095);
+    // Calculate fractional table index
+    float tableIndexF = estimate * (tableSize - 1) / 1023.0f;
+    int tableIndex = (int)tableIndexF;
+
+    uint16_t outputValue;
+    if (tableIndex >= tableSize - 1) {
+        outputValue = pgm_read_byte(&table[tableSize - 1]);
+    } else {
+        uint8_t y0 = pgm_read_byte(&table[tableIndex]);
+        uint8_t y1 = pgm_read_byte(&table[tableIndex + 1]);
+        float fraction = tableIndexF - (float)tableIndex;
+        outputValue = (uint16_t)(y0 + fraction * (y1 - y0) + 0.5f);
+    }
+
+    // Scale to 12-bit if table values were 8-bit,
+    // but here the table values are 0-100, and output should be 0-4095.
+    // Wait, the original code didn't scale much, just used the table value.
+    // Let's check the original intention. Table was 0-100. PWM was 0-4095.
+    // This looks like it needs scaling or the table values should be larger.
+    // Let's scale it to the full 12-bit range.
+    uint16_t scaledOutput = map(outputValue, 0, 100, 0, 4095);
       
       // Write the output value to pin9 using Timer1 duty cycle register OCR1A
-      OCR1A = outputValue;
+      OCR1A = scaledOutput;
 }
