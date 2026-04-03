@@ -8,7 +8,8 @@ test_files = [
     "test_translator_v3_switchable.cpp",
     "test_translator_v3_switchable2.cpp",
     "test_adc_to_pwm.cpp",
-    "test_noise_robustness.cpp"
+    "test_noise_robustness.cpp",
+    "test_failsafe.cpp"
 ]
 
 def run_test(test_file):

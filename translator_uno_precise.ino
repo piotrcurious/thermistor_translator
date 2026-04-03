@@ -25,6 +25,11 @@ const uint8_t tableSize = sizeof(table) / sizeof(table[0]);
 const uint8_t inputPin = A0;
 const uint8_t outputPin = 9;
 
+// Failsafe configuration: detect sensor disconnection/short
+const uint16_t FAILSAFE_ADC_MIN = 5;
+const uint16_t FAILSAFE_ADC_MAX = 1018;
+const uint16_t FAILSAFE_PWM     = 4095; // Default to full speed on failure
+
 // Define the interval for oversampling in milliseconds
 const uint16_t oversamplingInterval = 10;
 
@@ -93,7 +98,9 @@ void loop() {
     int tableIndex = (int)tableIndexF;
 
     uint16_t outputValue;
-    if (tableIndex >= tableSize - 1) {
+    if (estimate < FAILSAFE_ADC_MIN || estimate > FAILSAFE_ADC_MAX) {
+        outputValue = 100; // mapped back to 4095 later
+    } else if (tableIndex >= tableSize - 1) {
         outputValue = pgm_read_byte(&table[tableSize - 1]);
     } else {
         uint8_t y0 = pgm_read_byte(&table[tableIndex]);

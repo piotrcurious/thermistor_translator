@@ -22,6 +22,11 @@ static const uint8_t  TABLE_SIZE  = sizeof(TABLE) / sizeof(TABLE[0]);
 static const uint16_t PWM_MAX     = 4095;   // ICR1 TOP for 12-bit Fast PWM
 static const uint16_t ADC_MAX     = 1023;
 
+// Failsafe configuration: detect sensor disconnection/short
+static const uint16_t FAILSAFE_ADC_MIN = 5;
+static const uint16_t FAILSAFE_ADC_MAX = 1018;
+static const uint16_t FAILSAFE_PWM     = 4095; // Default to full speed on failure
+
 // ── Pins ─────────────────────────────────────────────────────────────────────
 static const uint8_t INPUT_PIN  = A0;
 static const uint8_t OUTPUT_PIN = 9;   // OC1A — Timer1 channel A
@@ -70,6 +75,7 @@ static uint16_t lookupInterpolate(float adcVal) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
+    Serial.begin(115200);
     pinMode(OUTPUT_PIN, OUTPUT);
 
     // Configure Timer1: Fast PWM, mode 14 (TOP = ICR1), no prescaler
@@ -119,12 +125,25 @@ void loop() {
         float K  = P_pred / (P_pred + KF_R);
         kf_x     = kf_x + K * (measurement - kf_x);
         kf_P     = (1.0f - K) * P_pred;
+
+        // Periodic reporting
+        static uint32_t lastReportMs = 0;
+        if (millis() - lastReportMs >= 500) {
+            Serial.print("ADC Raw: "); Serial.print(measurement);
+            Serial.print(" Filtered: "); Serial.println(kf_x);
+            lastReportMs = millis();
+        }
     }
 
     // ── Table lookup + interpolation ─────────────────────────────────────────
     // We do this every loop to ensure PWM is always set, although kf_x
     // only changes every OVERSAMPLE_MS.
-    uint16_t pwmVal = lookupInterpolate(kf_x);
+    uint16_t pwmVal;
+    if (kf_x < FAILSAFE_ADC_MIN || kf_x > FAILSAFE_ADC_MAX) {
+        pwmVal = FAILSAFE_PWM;
+    } else {
+        pwmVal = lookupInterpolate(kf_x);
+    }
 
     // ── Write to Timer1 directly ─────────────────────────────────────────────
     OCR1A = pwmVal;
